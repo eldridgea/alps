@@ -669,6 +669,10 @@ func handleGetMailbox(ctx *alps.Context) error {
 			msgs[i] = providerMessageToIMAP(msg)
 		}
 
+		if ctx.Server.Options.PrefetchEnabled {
+			go prefetchListedMessages(ctx.Session, mbox.Name(), msgs)
+		}
+
 		ctx.Server.Logger().Debugf("Cache MISS for messages in %s page %d (query: %q), fetched and cached %d messages", mbox.Name(), page, query, len(msgs))
 	}
 
@@ -683,6 +687,78 @@ func handleGetMailbox(ctx *alps.Context) error {
 		"Page":            page,
 		"MessagesPerPage": messagesPerPage,
 	})
+}
+
+// prefetchCacheKey builds the same cache key handleGetPart uses for a
+// message's default (no ?part=, no ?limit=) body fetch.
+func prefetchCacheKey(mboxName, alpsUID string, partPath []int) string {
+	return fmt.Sprintf("message:%s:%s:%v:limit%d", mboxName, alpsUID, partPath, 0)
+}
+
+// partToPrefetch decides which body part, if any, prefetchListedMessages
+// should fetch for a message: the same HTML/text part handleGetPart would
+// pick by default, or nil if there's no viewable part or its body is already
+// cached.
+func partToPrefetch(cache *alps.Cache, mboxName string, m *IMAPMessage) *IMAPPartNode {
+	part := m.HTMLPart()
+	if part == nil {
+		part = m.TextPart()
+	}
+	if part == nil {
+		return nil
+	}
+
+	if cached, ok := cache.Get(prefetchCacheKey(mboxName, m.AlpsUID, part.Path)); ok {
+		if cp, ok := cached.(CachedMessagePart); ok && cp.BodyData != nil {
+			return nil // already warm
+		}
+	}
+
+	return part
+}
+
+// prefetchListedMessages warms the message-body cache for a page of messages
+// that was just listed, so opening one is a cache hit instead of an IMAP
+// round trip. Runs in the background; errors are swallowed per-message so one
+// bad fetch doesn't stop the rest of the page.
+func prefetchListedMessages(sess *alps.Session, mboxName string, msgs []IMAPMessage) {
+	for i := range msgs {
+		m := &msgs[i]
+
+		part := partToPrefetch(sess.Cache(), mboxName, m)
+		if part == nil {
+			continue
+		}
+		cacheKey := prefetchCacheKey(mboxName, m.AlpsUID, part.Path)
+
+		wasUnseen := !m.HasFlag(imap.FlagSeen)
+
+		sess.DoMail(func(p provider.MailProvider) error {
+			uid, err := p.ParseMessageID(m.AlpsUID)
+			if err != nil {
+				return err
+			}
+			providerMsg, _, headerData, bodyData, err := p.GetMessagePartWithData(mboxName, uid, part.Path)
+			if err != nil {
+				return err
+			}
+			sess.Cache().Set(cacheKey, CachedMessagePart{
+				Message:    providerMsg,
+				HeaderData: headerData,
+				BodyData:   bodyData,
+				Mailbox:    mboxName,
+			})
+			if wasUnseen {
+				// Fetching the body without Peek marks the message \Seen;
+				// restore its unseen state since this wasn't a real open.
+				return p.SetMessagesFlags(mboxName, []provider.MessageID{uid}, provider.FlagOperation{
+					Op:    provider.FlagOpRemove,
+					Flags: []provider.Flag{provider.FlagSeen},
+				})
+			}
+			return nil
+		})
+	}
 }
 
 func handleNewMailbox(ctx *alps.Context) error {

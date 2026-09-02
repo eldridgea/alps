@@ -391,6 +391,7 @@ type Options struct {
 	EnabledPlugins          []string                // If empty, all plugins are enabled
 	CacheTTL                time.Duration           // Cache TTL, 0 means use default (10 minutes)
 	CacheEnabled            bool                    // If false, caching is disabled
+	PrefetchEnabled         bool                    // If true, warm the cache for the currently-listed page of messages
 	SessionDuration         time.Duration           // Session timeout, 0 means use default (30 minutes)
 	MaxSessionDuration      time.Duration           // Maximum session duration users can set, 0 means no limit
 	MaxSessions             int                     // Maximum total concurrent sessions, 0 means unlimited (default: 10000)

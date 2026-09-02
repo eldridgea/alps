@@ -16,6 +16,7 @@ import (
 type Config struct {
 	Server   ServerConfig            `toml:"server"`
 	Cache    CacheConfig             `toml:"cache"`
+	Prefetch PrefetchConfig          `toml:"prefetch"`
 	Logging  LoggingConfig           `toml:"logging"`
 	TLS      TLSConfig               `toml:"tls"`
 	Provider ProviderConfig          `toml:"provider"`
@@ -108,6 +109,10 @@ type RateLimitConfig struct {
 type CacheConfig struct {
 	TTLMinutes int  `toml:"ttl_minutes"`
 	Enabled    bool `toml:"enabled"`
+}
+
+type PrefetchConfig struct {
+	Enabled bool `toml:"enabled"` // Warm the cache for the currently-listed page of messages (default: false)
 }
 
 type LoggingConfig struct {
@@ -300,6 +305,9 @@ func (c *Config) ToOptions() (alps.Options, error) {
 	if !c.Cache.Enabled {
 		options.CacheEnabled = false
 	}
+
+	// Prefetch is opt-in: it adds background IMAP fetches per page view (default: false)
+	options.PrefetchEnabled = c.Prefetch.Enabled
 
 	// Set session duration config
 	if c.Server.SessionMinutes > 0 {

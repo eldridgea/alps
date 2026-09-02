@@ -200,6 +200,13 @@ ttl_minutes = 10
 # Set to false to disable all caching (not recommended)
 enabled = true
 
+
+[prefetch]
+# Warm the cache for the page of messages currently being listed, so opening
+# a message is instant instead of waiting on an IMAP fetch. Adds background
+# IMAP fetches per mailbox page view. Off by default.
+enabled = false
+
 [logging]
 # Log output destination
 # Options:
