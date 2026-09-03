@@ -433,7 +433,10 @@ func (p *Provider) GetMessagePart(mailbox string, id provider.MessageID, partPat
 	return msgMeta, part, nil
 }
 
-func (p *Provider) GetMessagePartRaw(mailbox string, id provider.MessageID, partPath []int, limit int64) (*provider.Message, []byte, []byte, error) {
+// GetMessagePartRaw fetches a part's raw header/body bytes. peek is ignored:
+// reading a maildir message file never marks it \Seen as a side effect, so
+// there is nothing to peek past.
+func (p *Provider) GetMessagePartRaw(mailbox string, id provider.MessageID, partPath []int, limit int64, peek bool) (*provider.Message, []byte, []byte, error) {
 	msgMeta, part, f, err := p.getMessagePartEntity(mailbox, id.String(), partPath)
 	if err != nil {
 		return nil, nil, nil, err
@@ -448,7 +451,9 @@ func (p *Provider) GetMessagePartRaw(mailbox string, id provider.MessageID, part
 	return msgMeta, headerBuf, bodyBuf, nil
 }
 
-func (p *Provider) GetMessagePartWithData(mailbox string, id provider.MessageID, partPath []int) (*provider.Message, *message.Entity, []byte, []byte, error) {
+// GetMessagePartWithData fetches a part's parsed entity plus raw
+// header/body bytes. peek is ignored; see GetMessagePartRaw.
+func (p *Provider) GetMessagePartWithData(mailbox string, id provider.MessageID, partPath []int, peek bool) (*provider.Message, *message.Entity, []byte, []byte, error) {
 	msgMeta, part, f, err := p.getMessagePartEntity(mailbox, id.String(), partPath)
 	if err != nil {
 		return nil, nil, nil, nil, err

@@ -127,8 +127,8 @@ func (m *MockProvider) GetMessagePart(mailbox string, id MessageID, partPath []i
 	return msg, entity, args.Error(2)
 }
 
-func (m *MockProvider) GetMessagePartRaw(mailbox string, id MessageID, partPath []int, limit int64) (*Message, []byte, []byte, error) {
-	args := m.Called(mailbox, id, partPath, limit)
+func (m *MockProvider) GetMessagePartRaw(mailbox string, id MessageID, partPath []int, limit int64, peek bool) (*Message, []byte, []byte, error) {
+	args := m.Called(mailbox, id, partPath, limit, peek)
 	var msg *Message
 	if val := args.Get(0); val != nil {
 		msg = val.(*Message)
@@ -143,8 +143,8 @@ func (m *MockProvider) GetMessagePartRaw(mailbox string, id MessageID, partPath 
 	return msg, b1, b2, args.Error(3)
 }
 
-func (m *MockProvider) GetMessagePartWithData(mailbox string, id MessageID, partPath []int) (*Message, *message.Entity, []byte, []byte, error) {
-	args := m.Called(mailbox, id, partPath)
+func (m *MockProvider) GetMessagePartWithData(mailbox string, id MessageID, partPath []int, peek bool) (*Message, *message.Entity, []byte, []byte, error) {
+	args := m.Called(mailbox, id, partPath, peek)
 	var msg *Message
 	var entity *message.Entity
 	if val := args.Get(0); val != nil {

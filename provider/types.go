@@ -39,8 +39,13 @@ type MailProvider interface {
 	ParseMessageID(id string) (MessageID, error)
 	GetMessageMetadata(mailbox string, id MessageID) (*Message, error)
 	GetMessagePart(mailbox string, id MessageID, partPath []int) (*Message, *message.Entity, error)
-	GetMessagePartRaw(mailbox string, id MessageID, partPath []int, limit int64) (*Message, []byte, []byte, error)
-	GetMessagePartWithData(mailbox string, id MessageID, partPath []int) (*Message, *message.Entity, []byte, []byte, error)
+	// GetMessagePartRaw fetches a part's raw header/body bytes. When peek is
+	// true, the fetch must not cause the message to be marked \Seen.
+	GetMessagePartRaw(mailbox string, id MessageID, partPath []int, limit int64, peek bool) (*Message, []byte, []byte, error)
+	// GetMessagePartWithData fetches a part's parsed entity plus raw
+	// header/body bytes. When peek is true, the fetch must not cause the
+	// message to be marked \Seen.
+	GetMessagePartWithData(mailbox string, id MessageID, partPath []int, peek bool) (*Message, *message.Entity, []byte, []byte, error)
 
 	// Message manipulation
 	SetMessagesFlags(mailbox string, ids []MessageID, op FlagOperation) error

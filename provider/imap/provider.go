@@ -911,7 +911,7 @@ func (p *IMAPProvider) GetMessageMetadata(mailbox string, id provider.MessageID)
 // GetMessagePart fetches a message part
 func (p *IMAPProvider) GetMessagePart(mailbox string, id provider.MessageID, partPath []int) (*provider.Message, *message.Entity, error) {
 	uid := id.(IMAPUID)
-	msg, part, _, _, err := p.getMessagePartWithData(mailbox, imap.UID(uid), partPath)
+	msg, part, _, _, err := p.getMessagePartWithData(mailbox, imap.UID(uid), partPath, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -919,10 +919,11 @@ func (p *IMAPProvider) GetMessagePart(mailbox string, id provider.MessageID, par
 	return &converted, part, nil
 }
 
-// GetMessagePartRaw fetches a message part's raw bytes
-func (p *IMAPProvider) GetMessagePartRaw(mailbox string, id provider.MessageID, partPath []int, limit int64) (*provider.Message, []byte, []byte, error) {
+// GetMessagePartRaw fetches a message part's raw bytes. When peek is true,
+// the fetch does not mark the message \Seen.
+func (p *IMAPProvider) GetMessagePartRaw(mailbox string, id provider.MessageID, partPath []int, limit int64, peek bool) (*provider.Message, []byte, []byte, error) {
 	uid := id.(IMAPUID)
-	msg, headerBuf, bodyBuf, err := p.getMessagePartRaw(mailbox, imap.UID(uid), partPath, limit)
+	msg, headerBuf, bodyBuf, err := p.getMessagePartRaw(mailbox, imap.UID(uid), partPath, limit, peek)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -930,10 +931,11 @@ func (p *IMAPProvider) GetMessagePartRaw(mailbox string, id provider.MessageID, 
 	return &converted, headerBuf, bodyBuf, nil
 }
 
-// GetMessagePartWithData fetches a message part with both entity and raw data
-func (p *IMAPProvider) GetMessagePartWithData(mailbox string, id provider.MessageID, partPath []int) (*provider.Message, *message.Entity, []byte, []byte, error) {
+// GetMessagePartWithData fetches a message part with both entity and raw
+// data. When peek is true, the fetch does not mark the message \Seen.
+func (p *IMAPProvider) GetMessagePartWithData(mailbox string, id provider.MessageID, partPath []int, peek bool) (*provider.Message, *message.Entity, []byte, []byte, error) {
 	uid := id.(IMAPUID)
-	msg, part, headerBuf, bodyBuf, err := p.getMessagePartWithData(mailbox, imap.UID(uid), partPath)
+	msg, part, headerBuf, bodyBuf, err := p.getMessagePartWithData(mailbox, imap.UID(uid), partPath, peek)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -941,7 +943,7 @@ func (p *IMAPProvider) GetMessagePartWithData(mailbox string, id provider.Messag
 	return &converted, part, headerBuf, bodyBuf, nil
 }
 
-func (p *IMAPProvider) getMessagePartRaw(mailbox string, uid imap.UID, partPath []int, limit int64) (*imapclient.FetchMessageBuffer, []byte, []byte, error) {
+func (p *IMAPProvider) getMessagePartRaw(mailbox string, uid imap.UID, partPath []int, limit int64, peek bool) (*imapclient.FetchMessageBuffer, []byte, []byte, error) {
 	if err := p.ensureMailboxSelected(mailbox); err != nil {
 		return nil, nil, nil, err
 	}
@@ -957,6 +959,7 @@ func (p *IMAPProvider) getMessagePartRaw(mailbox string, uid imap.UID, partPath 
 	}
 
 	bodyItem := &imap.FetchItemBodySection{
+		Peek: peek,
 		Part: partPath,
 	}
 	if len(partPath) > 0 {
@@ -1003,7 +1006,7 @@ func (p *IMAPProvider) getMessagePartRaw(mailbox string, uid imap.UID, partPath 
 	return msg, headerBuf, bodyBuf, nil
 }
 
-func (p *IMAPProvider) getMessagePartWithData(mailbox string, uid imap.UID, partPath []int) (*imapclient.FetchMessageBuffer, *message.Entity, []byte, []byte, error) {
+func (p *IMAPProvider) getMessagePartWithData(mailbox string, uid imap.UID, partPath []int, peek bool) (*imapclient.FetchMessageBuffer, *message.Entity, []byte, []byte, error) {
 	if err := p.ensureMailboxSelected(mailbox); err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -1019,6 +1022,7 @@ func (p *IMAPProvider) getMessagePartWithData(mailbox string, uid imap.UID, part
 	}
 
 	bodyItem := &imap.FetchItemBodySection{
+		Peek: peek,
 		Part: partPath,
 	}
 	if len(partPath) > 0 {

@@ -669,7 +669,10 @@ func handleGetMailbox(ctx *alps.Context) error {
 			msgs[i] = providerMessageToIMAP(msg)
 		}
 
-		if ctx.Server.Options.PrefetchEnabled {
+		// Prefetching a message body only helps once it can be cached; with
+		// caching disabled the session cache has a 1-second TTL (session.go),
+		// so it would just burn IMAP fetches for no benefit.
+		if ctx.Server.Options.PrefetchEnabled && ctx.Server.Options.CacheEnabled {
 			go prefetchListedMessages(ctx.Session, mbox.Name(), msgs)
 		}
 
@@ -731,14 +734,14 @@ func prefetchListedMessages(sess *alps.Session, mboxName string, msgs []IMAPMess
 		}
 		cacheKey := prefetchCacheKey(mboxName, m.AlpsUID, part.Path)
 
-		wasUnseen := !m.HasFlag(imap.FlagSeen)
-
 		sess.DoMail(func(p provider.MailProvider) error {
 			uid, err := p.ParseMessageID(m.AlpsUID)
 			if err != nil {
 				return err
 			}
-			providerMsg, _, headerData, bodyData, err := p.GetMessagePartWithData(mboxName, uid, part.Path)
+			// peek: true — this is a background warm-up, not a real open, so it
+			// must not mark the message \Seen.
+			providerMsg, _, headerData, bodyData, err := p.GetMessagePartWithData(mboxName, uid, part.Path, true)
 			if err != nil {
 				return err
 			}
@@ -748,14 +751,6 @@ func prefetchListedMessages(sess *alps.Session, mboxName string, msgs []IMAPMess
 				BodyData:   bodyData,
 				Mailbox:    mboxName,
 			})
-			if wasUnseen {
-				// Fetching the body without Peek marks the message \Seen;
-				// restore its unseen state since this wasn't a real open.
-				return p.SetMessagesFlags(mboxName, []provider.MessageID{uid}, provider.FlagOperation{
-					Op:    provider.FlagOpRemove,
-					Flags: []provider.Flag{provider.FlagSeen},
-				})
-			}
 			return nil
 		})
 	}
@@ -1206,10 +1201,10 @@ func handleGetPart(ctx *alps.Context, raw bool) error {
 				var err error
 				if raw {
 					// For raw mode, don't parse - just get bytes
-					providerMsg, headerData, bodyData, err = p.GetMessagePartRaw(mbox.Name(), uid, partPath, limit)
+					providerMsg, headerData, bodyData, err = p.GetMessagePartRaw(mbox.Name(), uid, partPath, limit, false)
 				} else {
 					// For normal mode, parse the message
-					providerMsg, _, headerData, bodyData, err = p.GetMessagePartWithData(mbox.Name(), uid, partPath)
+					providerMsg, _, headerData, bodyData, err = p.GetMessagePartWithData(mbox.Name(), uid, partPath, false)
 					if err != nil {
 						return err
 					}
@@ -1254,10 +1249,10 @@ func handleGetPart(ctx *alps.Context, raw bool) error {
 			var err error
 			if raw {
 				// For raw mode, don't parse - just get bytes
-				providerMsg, headerData, bodyData, err = p.GetMessagePartRaw(mbox.Name(), uid, partPath, limit)
+				providerMsg, headerData, bodyData, err = p.GetMessagePartRaw(mbox.Name(), uid, partPath, limit, false)
 			} else {
 				// For normal mode, parse the message
-				providerMsg, _, headerData, bodyData, err = p.GetMessagePartWithData(mbox.Name(), uid, partPath)
+				providerMsg, _, headerData, bodyData, err = p.GetMessagePartWithData(mbox.Name(), uid, partPath, false)
 				if err != nil {
 					return err
 				}
@@ -1524,7 +1519,7 @@ func handleComposeNew(ctx *alps.Context) error {
 					if err != nil {
 						return fmt.Errorf("invalid UID: %v", err)
 					}
-					_, entity, _, _, err := p.GetMessagePartWithData(sourcePath.Mailbox, parsedUid, partPath)
+					_, entity, _, _, err := p.GetMessagePartWithData(sourcePath.Mailbox, parsedUid, partPath, false)
 					if err != nil {
 						return fmt.Errorf("failed to fetch attachment %s: %v", pathStr, err)
 					}
