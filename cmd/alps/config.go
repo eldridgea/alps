@@ -107,8 +107,10 @@ type RateLimitConfig struct {
 }
 
 type CacheConfig struct {
-	TTLMinutes int  `toml:"ttl_minutes"`
-	Enabled    bool `toml:"enabled"`
+	TTLMinutes         int  `toml:"ttl_minutes"`
+	Enabled            bool `toml:"enabled"`
+	PrefetchInbox      bool `toml:"prefetch_inbox"`       // Proactively cache INBOX messages after login (default: false)
+	PrefetchInboxLimit int  `toml:"prefetch_inbox_limit"` // Max INBOX messages to prefetch when enabled (default: 100)
 }
 
 type LoggingConfig struct {
@@ -301,6 +303,18 @@ func (c *Config) ToOptions() (alps.Options, error) {
 	}
 	if !c.Cache.Enabled {
 		options.CacheEnabled = false
+	}
+
+	// Prefetching only makes sense on top of a real cache: if caching is
+	// disabled, sessions get a 1-second dummy cache (see session.go), so
+	// warming it would just be wasted IMAP traffic.
+	options.PrefetchInboxOnLogin = c.Cache.Enabled && c.Cache.PrefetchInbox
+	if c.Cache.PrefetchInbox && !c.Cache.Enabled {
+		fmt.Fprintln(os.Stderr, "warning: [cache] prefetch_inbox is enabled but cache.enabled is false; prefetch will be a no-op")
+	}
+	options.PrefetchInboxLimit = 100
+	if c.Cache.PrefetchInboxLimit > 0 {
+		options.PrefetchInboxLimit = c.Cache.PrefetchInboxLimit
 	}
 
 	// Set session duration config

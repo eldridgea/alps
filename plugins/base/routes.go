@@ -952,6 +952,8 @@ func handleLogin(ctx *alps.Context) error {
 		// Set session cookie: persistent if "remember me" checked, browser session otherwise
 		ctx.SetSessionWithExpiry(s, persistent)
 
+		triggerInboxPrefetch(ctx, s)
+
 		return ctx.JSON(http.StatusOK, map[string]interface{}{"ok": true})
 	}
 

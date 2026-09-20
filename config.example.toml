@@ -213,6 +213,14 @@ ttl_minutes = 10
 # Set to false to disable all caching (not recommended)
 enabled = true
 
+# Proactively cache INBOX message metadata and bodies right after login
+# (default: false). Has no effect if `enabled` above is false.
+prefetch_inbox = false
+
+# Max number of INBOX messages to prefetch when prefetch_inbox is enabled
+# (default: 100)
+prefetch_inbox_limit = 100
+
 [logging]
 # Log output destination
 # Options:

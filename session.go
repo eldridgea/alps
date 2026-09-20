@@ -168,6 +168,13 @@ func (s *Session) Cache() *Cache {
 	return s.cache
 }
 
+// Closed returns a channel that's closed when the session ends (logout,
+// eviction, or expiry), for callers that need to cancel background work
+// tied to the session's lifetime.
+func (s *Session) Closed() <-chan struct{} {
+	return s.closed
+}
+
 // SetAuthenticated2FA marks this session as having completed 2FA verification.
 func (s *Session) SetAuthenticated2FA(authenticated bool) {
 	s.authenticated2FA = authenticated
@@ -564,6 +571,8 @@ type SessionManager struct {
 	maxAttachmentSize        int64 // Max attachment size per composer in bytes
 	maxSessionAttachmentSize int64 // Max attachment size per session in bytes
 	maxGlobalAttachmentSize  int64 // Max global attachment size in bytes
+	prefetchInboxOnLogin     bool  // Proactively cache INBOX messages after login
+	prefetchInboxLimit       int   // Max INBOX messages to prefetch when enabled
 
 	globalAttachmentSize atomic.Int64 // Tracks current total attachment size across all sessions
 
@@ -610,6 +619,18 @@ func newSessionManager(connectProviderFunc provider.AuthenticatedProviderFactory
 		maxSessionAttachmentSize: int64(maxSessionAttachmentMiB) << 20,
 		maxGlobalAttachmentSize:  int64(maxGlobalAttachmentMiB) << 20,
 	}
+}
+
+// PrefetchInboxEnabled reports whether sessions should proactively cache
+// INBOX messages after login.
+func (sm *SessionManager) PrefetchInboxEnabled() bool {
+	return sm.prefetchInboxOnLogin
+}
+
+// PrefetchInboxLimit returns the max number of INBOX messages to prefetch
+// when PrefetchInboxEnabled is true.
+func (sm *SessionManager) PrefetchInboxLimit() int {
+	return sm.prefetchInboxLimit
 }
 
 func (sm *SessionManager) Close() {

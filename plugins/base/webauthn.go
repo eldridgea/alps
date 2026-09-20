@@ -471,6 +471,8 @@ func handleVerifyFinish(ctx *alps.Context) error {
 	// This is necessary to ensure the session persists correctly
 	ctx.SetSessionWithExpiry(session, persistent)
 
+	triggerInboxPrefetch(ctx, session)
+
 	// Set login token for session restoration after server restart
 	// Retrieve credentials that were stored during initial login from session memory
 	if credData, ok := session.GetData("2fa_login_credentials"); ok {

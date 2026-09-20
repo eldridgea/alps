@@ -41,6 +41,7 @@ type testServer struct {
 	client *http.Client
 	store  *maildir.Provider
 	dir    string // the account's maildir
+	srv    *alps.Server
 }
 
 func newTestServer(t *testing.T) *testServer {
@@ -49,6 +50,14 @@ func newTestServer(t *testing.T) *testServer {
 }
 
 func newTestServerWithSMTP(t *testing.T, smtpServer string) *testServer {
+	t.Helper()
+	return newTestServerWithOptions(t, smtpServer, nil)
+}
+
+// newTestServerWithOptions is like newTestServerWithSMTP, but lets a test
+// tweak the alps.Options before the server starts (e.g. to turn on inbox
+// prefetching), without duplicating the maildir/account setup.
+func newTestServerWithOptions(t *testing.T, smtpServer string, configure func(*alps.Options)) *testServer {
 	t.Helper()
 	base := t.TempDir()
 	passwd := filepath.Join(base, "passwd")
@@ -85,6 +94,9 @@ func newTestServerWithSMTP(t *testing.T, smtpServer string) *testServer {
 		CacheEnabled: true,
 		CacheTTL:     time.Minute,
 	}
+	if configure != nil {
+		configure(opts)
+	}
 	srv, err := alps.New(alps.NewLogger(), opts)
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +108,7 @@ func newTestServerWithSMTP(t *testing.T, smtpServer string) *testServer {
 	})
 
 	jar, _ := cookiejar.New(nil)
-	return &testServer{t: t, url: ts.URL, client: &http.Client{Jar: jar}, store: store, dir: filepath.Join(base, "ada")}
+	return &testServer{t: t, url: ts.URL, client: &http.Client{Jar: jar}, store: store, dir: filepath.Join(base, "ada"), srv: srv}
 }
 
 type response struct {
